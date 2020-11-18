@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2019 Antony Polukhin
+// Copyright (c) 2016-2020 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -18,6 +18,7 @@
 #include <boost/pfr/detail/make_flat_tuple_of_references.hpp>
 #include <boost/pfr/detail/make_integer_sequence.hpp>
 #include <boost/pfr/detail/size_array.hpp>
+#include <boost/pfr/detail/size_t_.hpp>
 #include <boost/pfr/detail/rvalue_t.hpp>
 
 #ifdef __clang__
@@ -32,10 +33,7 @@ namespace boost { namespace pfr { namespace detail {
 
 ///////////////////// General utility stuff
 
-template <std::size_t Index>
-using size_t_ = std::integral_constant<std::size_t, Index >;
-
-template <class T> struct identity{
+template <class T> struct identity {
     typedef T type;
 };
 
@@ -60,7 +58,7 @@ namespace typeid_conversions {
 
 constexpr std::size_t native_types_mask = 31;
 constexpr std::size_t bits_per_extension = 3;
-constexpr std::size_t extension_maks = (
+constexpr std::size_t extension_mask = (
     static_cast<std::size_t>((1 << bits_per_extension) - 1)
         << static_cast<std::size_t>(sizeof(std::size_t) * 8 - bits_per_extension)
 );
@@ -89,7 +87,7 @@ constexpr std::size_t native_ref_type = (
 );
 
 template <std::size_t Index, std::size_t Extension>
-using if_extension = std::enable_if_t< (Index & extension_maks) == Extension >*;
+using if_extension = std::enable_if_t< (Index & extension_mask) == Extension >*;
 
 ///////////////////// Helper functions
 template <std::size_t Unptr>
@@ -508,7 +506,10 @@ template <class T>
 constexpr auto internal_tuple_with_same_alignment() noexcept {
     typedef typename std::remove_cv<T>::type type;
 
-    static_assert(std::is_pod<type>::value, "====================> Boost.PFR: Type can not be used is flat_ functions, because it's not POD");
+    static_assert(
+        std::is_trivial<type>::value && std::is_standard_layout<type>::value,
+        "====================> Boost.PFR: Type can not be reflected without Loophole or C++17, because it's not POD"
+    );
     static_assert(!std::is_reference<type>::value, "====================> Boost.PFR: Not applyable");
     constexpr auto res = detail::as_flat_tuple_impl<type>(
         detail::make_index_sequence< decltype(detail::flat_array_of_type_ids<type>())::size() >()
@@ -527,7 +528,7 @@ struct ubiq_is_flat_refelectable {
 
     template <class Type>
     constexpr operator Type() const noexcept {
-        is_flat_refelectable = std::is_fundamental<Type>::value;
+        is_flat_refelectable = std::is_fundamental<std::remove_pointer_t<Type>>::value;
         return {};
     }
 };
@@ -561,8 +562,6 @@ auto tie_as_flat_tuple(T& lvalue) noexcept {
     return boost::pfr::detail::make_flat_tuple_of_references(lvalue, getter, size_t_<0>{}, size_t_<tuple_type::size_v>{});
 }
 
-#if !BOOST_PFR_USE_CPP17
-
 template <class T>
 auto tie_as_tuple(T& val) noexcept {
     static_assert(
@@ -571,12 +570,10 @@ auto tie_as_tuple(T& val) noexcept {
     );
     static_assert(
         boost::pfr::detail::is_flat_refelectable<T>( detail::make_index_sequence<boost::pfr::detail::fields_count<T>()>{} ),
-        "====================> Boost.PFR: Not possible in C++14 to represent that type without loosing information. Use boost::pfr::flat_ version, or change type definition, or enable C++17"
+        "====================> Boost.PFR: Not possible in C++14 to represent that type without loosing information. Change type definition or enable C++17"
     );
     return boost::pfr::detail::tie_as_flat_tuple(val);
 }
-
-#endif // #if !BOOST_PFR_USE_CPP17
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -595,8 +592,6 @@ struct ubiq_constructor_constexpr_copy {
 };
 
 /////////////////////
-
-#if !BOOST_PFR_USE_CPP17
 
 template <class T, std::size_t... I>
 struct is_constexpr_aggregate_initializable { // TODO: try to fix it
@@ -695,8 +690,6 @@ void for_each_field_dispatcher(T& t, F&& f, std::index_sequence<I...>) {
         std::integral_constant<bool, is_flat_refelectable_val>{}
     );
 }
-
-#endif // #if !BOOST_PFR_USE_CPP17
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

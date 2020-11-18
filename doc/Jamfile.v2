@@ -30,50 +30,29 @@ local doxygen_params =
         <doxygen:param>INLINE_SIMPLE_STRUCTS=YES
         <doxygen:param>SORT_MEMBER_DOCS=NO
         <doxygen:param>"ALIASES= \\
-            \"flattening{1}=\\xmlonly<link linkend='boost_precise_and_flat_reflectio.tutorial.flattening'>\\1</link>\\endxmlonly\" \\
-            \"podops=\\b See \\b Also: \\xmlonly<link linkend='boost_precise_and_flat_reflectio.tutorial.three_ways_of_getting_operators'>Three ways of getting operators</link>\\endxmlonly\" \\
-            \"constexprinit{1}=\\xmlonly<link linkend='boost_precise_and_flat_reflectio.requirements_and_limitations'>\\1</link>\\endxmlonly\" \\
-            \"rcast=\\b Note: If reflecting structures with enums may `reinterpret_cast` enum to a reference to underlying type.\" \\
-            \"flatpod{1}=\\xmlonly<link linkend='boost_precise_and_flat_reflectio.requirements_and_limitations'>\\1</link>\\endxmlonly\" \\
+            \"forcedlink{1}=\\xmlonly<link linkend='boost.pfr.\\1'>\\endxmlonly boost::pfr::\\1\\xmlonly</link>\\endxmlonly\" \\
+            \"podops=\\b See \\b Also : \\xmlonly<link linkend='boost_pfr.tutorial.three_ways_of_getting_operators'>\\endxmlonly 'Three ways of getting operators' \\xmlonly</link>\\endxmlonly\" \\
+            \"customio=\\b See \\b Also : \\xmlonly<link linkend='boost_pfr.tutorial.custom_printing_of_aggregates'>\\endxmlonly 'Custom printing of aggregates' \\xmlonly</link>\\endxmlonly for info on how to implement your own manipulator with custom format.\" \\
+            \"aggregate=\\xmlonly<link linkend='boost_pfr.limitations_and_configuration'>\\endxmlonly simple aggregate \\xmlonly</link>\\endxmlonly\" \\
+            \"BOOST_PFR_DOXYGEN_INVOKED\" \\
         "
     ;
 
-doxygen autodoc_all
+doxygen autodoc_pfr
     :
         [ glob ../../../boost/pfr.hpp ]
+        [ glob ../../../boost/pfr/*.hpp ]
     :
         $(doxygen_params)
-        <xsl:param>"boost.doxygen.reftitle=Include all"
-    ;
-
-
-doxygen autodoc_flat
-    :
-        [ glob ../../../boost/pfr/flat.hpp ]
-        [ glob ../../../boost/pfr/flat/*.hpp ]
-    :
-        $(doxygen_params)
-        <xsl:param>"boost.doxygen.reftitle=Flat Reflection"
-    ;
-
-
-doxygen autodoc_precise
-    :
-        [ glob ../../../boost/pfr/precise.hpp ]
-        [ glob ../../../boost/pfr/precise/*.hpp ]
-    :
-        $(doxygen_params)
-        <xsl:param>"boost.doxygen.reftitle=Precise Reflection"
+        <xsl:param>"boost.doxygen.reftitle=Reference Section"
     ;
 
 boostbook pfr-doc
     :
         pfr.qbk
     :
-        <dependency>autodoc_all
-        <dependency>autodoc_precise
-        <dependency>autodoc_flat
-        <xsl:param>boost.root=http://www.boost.org/doc/libs/1_63_0
+        <dependency>autodoc_pfr
+        <xsl:param>boost.root=https://www.boost.org/doc/libs/1_72_0
         #<xsl:param>boost.root=../../../.
         <xml:param>html.stylesheet=../../../../doc/src/boostbook.css
     ;

@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (c) 2016-2019 Antony Polukhin
+# Copyright (c) 2016-2020 Antony Polukhin
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -13,7 +13,7 @@ import string
 # Skipping some letters that may produce keywords or are hard to read, or shadow template parameters
 ascii_letters = string.ascii_letters.replace("o", "").replace("O", "").replace("i", "").replace("I", "").replace("T", "")
 
-PROLOGUE = """// Copyright (c) 2016-2019 Antony Polukhin
+PROLOGUE = """// Copyright (c) 2016-2020 Antony Polukhin
 //
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
@@ -29,13 +29,12 @@ PROLOGUE = """// Copyright (c) 2016-2019 Antony Polukhin
 #pragma once
 
 #include <boost/pfr/detail/config.hpp>
-
 #if !BOOST_PFR_USE_CPP17
 #   error C++17 is required for this header.
 #endif
 
 #include <boost/pfr/detail/sequence_tuple.hpp>
-#include <boost/pfr/detail/fields_count.hpp>
+#include <boost/pfr/detail/size_t_.hpp>
 
 namespace boost { namespace pfr { namespace detail {
 
@@ -51,7 +50,7 @@ constexpr auto tie_as_tuple(T& /*val*/, size_t_<0>) noexcept {
 
 template <class T>
 constexpr auto tie_as_tuple(T& val, size_t_<1>, std::enable_if_t<std::is_class< std::remove_cv_t<T> >::value>* = 0) noexcept {
-  auto& [a] = val;
+  auto& [a] = val; // ====================> Boost.PFR: User-provided type is not a SimpleAggregate.
   return ::boost::pfr::detail::make_tuple_of_references(a);
 }
 
@@ -65,16 +64,10 @@ constexpr auto tie_as_tuple(T& val, size_t_<1>, std::enable_if_t<!std::is_class<
 
 ############################################################################################################################
 EPILOGUE = """
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template <class T>
-constexpr auto tie_as_tuple(T& val) noexcept {
-  static_assert(
-    !std::is_union<T>::value,
-    "====================> Boost.PFR: For safety reasons it is forbidden to reflect unions. See `Reflection of unions` section in the docs for more info."
-  );
-  typedef size_t_<fields_count<T>()> fields_count_tag;
-  return boost::pfr::detail::tie_as_tuple(val, fields_count_tag{});
+template <class T, std::size_t I>
+constexpr void tie_as_tuple(T& /*val*/, size_t_<I>) noexcept {
+  static_assert(sizeof(T) && false,
+                "====================> Boost.PFR: Too many fields in a structure T. Regenerate include/boost/pfr/detail/core17_generated.hpp file for appropriate count of fields. For example: `python ./misc/generate_cpp17.py 300 > include/boost/pfr/detail/core17_generated.hpp`");
 }
 
 }}} // namespace boost::pfr::detail
@@ -83,52 +76,36 @@ constexpr auto tie_as_tuple(T& val) noexcept {
 """
 
 ############################################################################################################################
-generate_sfinae_attempts = False
-
-
-if generate_sfinae_attempts:
-    print """
-    template <class T, std::size_t I>
-    constexpr auto tie_as_tuple(T& val, size_t_<I>) noexcept {
-      return tie_as_tuple(val, size_t_<I - 1>{});
-    }
-    """
 
 
 indexes = "    a"
-print PROLOGUE
+print(PROLOGUE)
 funcs_count = 100 if len(sys.argv) == 1 else int(sys.argv[1])
 max_args_on_a_line = len(ascii_letters)
-for i in xrange(1, funcs_count):
+for i in range(1, funcs_count):
     if i % max_args_on_a_line == 0:
         indexes += ",\n    "
     else:
         indexes += ","
 
     if i >= max_args_on_a_line:
-        indexes += ascii_letters[i / max_args_on_a_line - 1] 
+        indexes += ascii_letters[i // max_args_on_a_line - 1]
     indexes += ascii_letters[i % max_args_on_a_line]
 
-    print "template <class T>"
-    print "constexpr auto tie_as_tuple(T& val, size_t_<" + str(i + 1) + ">) noexcept {"
+    print("template <class T>")
+    print("constexpr auto tie_as_tuple(T& val, size_t_<" + str(i + 1) + ">) noexcept {")
     if i < max_args_on_a_line:
-        print "  auto& [" + indexes.strip() + "] = val;"
-        print "  return ::boost::pfr::detail::make_tuple_of_references(" + indexes.strip() + ");"
+        print("  auto& [" + indexes.strip() + "] = val; // ====================> Boost.PFR: User-provided type is not a SimpleAggregate.")
+        print("  return ::boost::pfr::detail::make_tuple_of_references(" + indexes.strip() + ");")
     else:
-        print "  auto& ["
-        print indexes
-        print "  ] = val;"
-        print ""
-        print "  return ::boost::pfr::detail::make_tuple_of_references("
-        print indexes
-        print "  );"
+        print("  auto& [")
+        print(indexes)
+        print("  ] = val; // ====================> Boost.PFR: User-provided type is not a SimpleAggregate.")
+        print("")
+        print("  return ::boost::pfr::detail::make_tuple_of_references(")
+        print(indexes)
+        print("  );")
 
-    print "}\n"
+    print("}\n")
 
-    if generate_sfinae_attempts:
-        print "template <class T>"
-        print "constexpr auto tie_as_tuple(T& val, size_t_<" + str(i + 1) + "> v) noexcept"
-        print "  ->decltype( ::boost::pfr::detail::tie_as_tuple0(std::forward<T>(val), v) )"
-        print "{ return ::boost::pfr::detail::tie_as_tuple0(std::forward<T>(val), v); }\n"
-
-print EPILOGUE
+print(EPILOGUE)
